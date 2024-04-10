@@ -4,7 +4,6 @@ import java.awt.event.*;
 import java.sql.*;
 import java.util.*;
 import java.util.Timer;
-import javax.mail.*;
 
 public class QueryButtonGUI extends JFrame implements ActionListener {
     private static final String DATABASE_NAME = "dkc353_4";
@@ -330,43 +329,56 @@ public class QueryButtonGUI extends JFrame implements ActionListener {
                 break;
 
             case 21:
-
-                JOptionPane.showMessageDialog(this, "DISPLAY QUERY RESULT");
+                System.out.println("Sent emails");
+                emptyEmailQueue();
                 break;
             default:
                 System.out.println("");
         }
     }
 
+    private static void emptyEmailQueue(){
+        try {
+            Class.forName(DRIVER);
+            Connection conn = DriverManager.getConnection(CONNECTION_STRING, USERNAME, PASSWORD);
+            System.out.println("Database connected");
+
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM EmailQueue");
+            ArrayList<Integer> toDelete = new ArrayList<Integer>();
+            while (rs.next()) {
+                String to = rs.getString("receiver");
+                String subject = rs.getString("subject");
+                String body = rs.getString("body");
+
+                try {
+                    EmailUtility.sendEmail(to, subject, body);
+                     
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+
+                
+                toDelete.add(rs.getInt("id"));
+            }
+
+            for (int id : toDelete) {
+                stmt.executeUpdate("DELETE FROM EmailQueue WHERE id = " + id);
+            }
+
+            rs.close();
+            stmt.close();
+            conn.close();
+
+        } catch (Exception e) {
+            throw new IllegalStateException("Cannot connect the database. " + e.getCause(), e);
+        }
+    }
+
     public static void sendEmails() {
         TimerTask task = new TimerTask() {
             public void run() {
-                try {
-                    Class.forName(DRIVER);
-                    Connection conn = DriverManager.getConnection(CONNECTION_STRING, USERNAME, PASSWORD);
-                    System.out.println("Database connected");
-
-                    Statement stmt = conn.createStatement();
-                    ResultSet rs = stmt.executeQuery("SELECT * FROM EmailQueue");
-                    while (rs.next()) {
-                        String to = rs.getString("receiver");
-                        String subject = rs.getString("subject");
-                        String body = rs.getString("body");
-
-                        try {
-                            EmailUtility.sendEmail(to, subject, body);
-                             
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                        }
-
-                        // stmt.executeUpdate("DELETE FROM EmailQueue WHERE id = " + rs.getInt("id"));
-                        
-                    }
-
-                } catch (Exception e) {
-                    throw new IllegalStateException("Cannot connect the database. " + e.getCause(), e);
-                }
+                emptyEmailQueue();
             }
         };
 
